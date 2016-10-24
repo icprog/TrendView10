@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/images">
+        <file>collapse.ico</file>
+        <file>expand.ico</file>
+        <file>toback50.ico</file>
+        <file>toback100.ico</file>
+        <file>tofront50.ico</file>
+        <file>tofront100.ico</file>
+        <file>chart.ico</file>
+        <file>exit.ico</file>
+    </qresource>
+</RCC>
