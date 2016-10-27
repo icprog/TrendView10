@@ -1,12 +1,26 @@
 <RCC>
     <qresource prefix="/images">
+        <file>chart.ico</file>
         <file>collapse.ico</file>
+        <file>exit.ico</file>
         <file>expand.ico</file>
         <file>toback50.ico</file>
         <file>toback100.ico</file>
         <file>tofront50.ico</file>
         <file>tofront100.ico</file>
-        <file>chart.ico</file>
-        <file>exit.ico</file>
+        <file>leftarrow2.ico</file>
+        <file>rightarrow2.ico</file>
+        <file>leftarrow1.ico</file>
+        <file>rightarrow1.ico</file>
+        <file>1leftarrow_3686.ico</file>
+        <file>1rightarrow_3686.ico</file>
+        <file>2leftarrow_1058.ico</file>
+        <file>2rightarrow_1058.ico</file>
+        <file>collapse2.ico</file>
+        <file>collapse3.ico</file>
+        <file>expand2.ico</file>
+        <file>expand3.ico</file>
+        <file>1leftarrow_small.ico</file>
+        <file>1rightarrow_small.ico</file>
     </qresource>
 </RCC>

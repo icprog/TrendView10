@@ -210,15 +210,75 @@ MainWindow::MainWindow(QWidget *parent) :
         tr->checkBox.setChecked(true);
         ui->gridLayoutTrendsInfo->addWidget(&(tr->labelName),i,2);
         ui->gridLayoutTrendsInfo->addWidget(&(tr->lineEditValue),i,3);
+
+        tr->lineEditValue.setReadOnly(true);
         tr->lineEditValue.setFixedWidth(100);
         tr->lineEditValue.setAlignment(Qt::AlignHCenter);
+
+        //ui->gridLayoutTrendsInfo->addWidget(&(tr->lineEditScale),i,4);
+        //tr->lineEditScale.setFixedWidth(100);
+        //tr->lineEditScale.setAlignment(Qt::AlignHCenter);
+        //tr->lineEditScale.setText(QString::number(tr->min,'f',1)+" - "+QString::number(tr->max,'f',1));
+
         ui->gridLayoutTrendsInfo->addWidget(&(tr->labelDesc),i,4);
 
 
 
+        //scales at right
+
+        ui->gridLayoutMinMax->addWidget(&(tr->labelColorBoxMax),i,0);
+        ui->gridLayoutMinMax->addWidget(&(tr->lineEditScaleMax),i,1);
+        tr->labelColorBoxMax.setFixedWidth(15);
+        tr->labelColorBoxMax.setFixedHeight(15);
+        tr->labelColorBoxMax.setAutoFillBackground(true);
+        tr->labelColorBoxMax.setPalette(palette);
+        tr->lineEditScaleMax.setMaximum(99999.0);
+        tr->lineEditScaleMax.setMinimum(-99999.0);
+        tr->lineEditScaleMax.setSingleStep(1.0);
+        tr->lineEditScaleMax.setDecimals(1);
+        tr->lineEditScaleMax.setAlignment(Qt::AlignHCenter);
+        tr->lineEditScaleMax.setValue(tr->max);
+        tr->lineEditScaleMax.setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
+        connect(&(tr->lineEditScaleMax),static_cast<void (QDoubleSpinBox::*)(double) > (&QDoubleSpinBox::valueChanged),[=](const double newVal){
+                tr->max=newVal;
+                tr->yAxis->setRange(tr->min,tr->max);
+                wGraphic->replot();
+        });
+
+        //min
+        tr->labelColorBoxMin.setFixedWidth(15);
+        tr->labelColorBoxMin.setFixedHeight(15);
+        tr->labelColorBoxMin.setAutoFillBackground(true);
+        tr->labelColorBoxMin.setPalette(palette);
+        tr->lineEditScaleMin.setMaximum(99999.0);
+        tr->lineEditScaleMin.setMinimum(-99999.0);
+        tr->lineEditScaleMin.setSingleStep(1.0);
+        tr->lineEditScaleMin.setDecimals(1);
+        tr->lineEditScaleMin.setAlignment(Qt::AlignHCenter);
+        tr->lineEditScaleMin.setValue(tr->min);
+        connect(&(tr->lineEditScaleMin),static_cast<void (QDoubleSpinBox::*)(double) > (&QDoubleSpinBox::valueChanged),[=](const double newVal){
+                tr->min=newVal;
+                tr->yAxis->setRange(tr->min,tr->max);
+                wGraphic->replot();
+        });
+
         trends.push_back(tr);
     }
 
+    QWidget* empty = new QWidget();
+    empty->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
+
+    ui->gridLayoutMinMax->addWidget(empty,trends.size(),0);
+
+
+    for(int i=0;i<trends.size();++i)
+    {
+        ui->gridLayoutMinMax->addWidget(&(trends[i]->labelColorBoxMin),i+trends.size()+1,0);
+        ui->gridLayoutMinMax->addWidget(&(trends[i]->lineEditScaleMin),i+trends.size()+1,1);
+        trends[i]->lineEditScaleMax.setSizePolicy(QSizePolicy::Minimum,QSizePolicy::Minimum);
+
+
+    }
 
     vizirLabel = new QCPItemText(wGraphic);
 
@@ -230,7 +290,16 @@ MainWindow::MainWindow(QWidget *parent) :
     AllTrendsAddFromToDay(dt_current.date(), QTime(0,0,0), dt_current.time());
 
 
+
+    connect(wGraphic->xAxis,SIGNAL(rangeChanged(QCPRange)),this,SLOT(GraphicXAxisRangeChanged(QCPRange)));
     wGraphic->xAxis->setRange(dt_current.addSecs(-7200).toTime_t(),dt_current.toTime_t());
+    //ui->dateTimeEditStart->setDateTime(dt_current.addSecs(-7200));
+    //ui->dateTimeEditEnd->setDateTime(dt_current);
+
+    connect(ui->dateTimeEditStart,SIGNAL(dateTimeChanged(QDateTime)),this,SLOT(StartEndDateTimeChanged()));
+    connect(ui->dateTimeEditEnd,SIGNAL(dateTimeChanged(QDateTime)),this,SLOT(StartEndDateTimeChanged()));
+
+
 
     //загрузим данные если нужны за прошлый день
     CheckNeededBackDaysAndLoad(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
@@ -305,6 +374,7 @@ void MainWindow::slotMousePress(QMouseEvent *event)
 
     vizirLabel->position->setType(QCPItemPosition::ptPlotCoords);
     vizirLabel->setPositionAlignment(Qt::AlignBottom|Qt::AlignHCenter);
+    //vizirLabel->setClipToAxisRect(false);
     //vizirLabel->setPositionAlignment(Qt::AlignVCenter|Qt::AlignLeft);
     vizirLabel->position->setAxes(wGraphic->xAxis,wGraphic->yAxis);
 
@@ -689,20 +759,16 @@ void MainWindow::ButtonCollapse()
 
     if (!useThread)
     {
-
-    CheckNeededBackDaysAndLoad(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
-    RecalcGridInterval();
-    wGraphic->replot();
-    qDebug() << displayedInterval_sec;
+        CheckNeededBackDaysAndLoad(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
     }
     else
     {
         loadThread.SetDateFrom(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
         loadThread.start();
-        RecalcGridInterval();
-        wGraphic->replot();
     }
 
+    RecalcGridInterval();
+    wGraphic->replot();
 
     ui->buttonExpand->setEnabled(true);
 
@@ -811,6 +877,40 @@ void MainWindow::Button50Back()
     wGraphic->replot();
 }
 //==================================================================================
+void MainWindow::StartEndDateTimeChanged()
+{
+    if (ui->dateTimeEditEnd->dateTime() > QDateTime::currentDateTime())
+    {
+        ui->dateTimeEditEnd->setDateTime(QDateTime::currentDateTime());
+    }
+
+    wGraphic->xAxis->setRange(ui->dateTimeEditStart->dateTime().toTime_t(),
+                              ui->dateTimeEditEnd->dateTime().toTime_t());
+
+
+    displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
+
+    if (!useThread)
+    {
+        CheckNeededBackDaysAndLoad(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
+    }
+    else
+    {
+        loadThread.SetDateFrom(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
+        loadThread.start();
+    }
+
+    RecalcGridInterval();
+    wGraphic->replot();
+
+}
+//==================================================================================
+void MainWindow::GraphicXAxisRangeChanged(QCPRange newRange)
+{
+    ui->dateTimeEditStart->setDateTime(QDateTime::fromTime_t(newRange.lower));
+    ui->dateTimeEditEnd->setDateTime(QDateTime::fromTime_t(newRange.upper));
+}
+//==================================================================================
 void MainWindow::ComboBoxThemeChanged(int newThemeIndex)
 {
     static QPalette standartPalette=qApp->palette();
@@ -887,7 +987,7 @@ void MainWindow::ComboBoxThemeChanged(int newThemeIndex)
         qApp->setPalette(darkPalette);
         break;
     case 1:  //white
-        wGraphic->setBackground(QBrush(Qt::white));  //- to white theme
+        wGraphic->setBackground(QBrush(Qt::white)); //QColor(240,240,240 //- to white theme
         wGraphic->xAxis->setBasePen(QPen(Qt::black));
         wGraphic->xAxis->setTickPen(QPen(Qt::black));
         wGraphic->xAxis->setSubTickPen(QPen(Qt::black));

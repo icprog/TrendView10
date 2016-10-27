@@ -53,6 +53,14 @@ public:
     QCheckBox checkBox;
     QLabel labelName;
     QLineEdit lineEditValue;
+    QLineEdit lineEditScale;
+
+    QLabel labelColorBoxMax;
+    /*QLineEdit*/ QDoubleSpinBox lineEditScaleMax;
+    QLabel labelColorBoxMin;
+    /*QLineEdit*/ QDoubleSpinBox lineEditScaleMin;
+
+
     QLabel labelDesc;
 
 public slots:
@@ -64,8 +72,8 @@ class CheckNeededBackDaysAndLoadThread : public AutoStopThread
 {
     Q_OBJECT
 public:
-    CheckNeededBackDaysAndLoadThread(){};
-    virtual ~CheckNeededBackDaysAndLoadThread(){};
+    CheckNeededBackDaysAndLoadThread(){}
+    virtual ~CheckNeededBackDaysAndLoadThread(){}
 private:
     QDate m_dateFrom;
     QMutex m_mtx;
@@ -154,6 +162,8 @@ private slots:
     void Button100Back();
     void Button50Forward();
     void Button50Back();
+    void StartEndDateTimeChanged();
+    void GraphicXAxisRangeChanged(QCPRange newRange);
 
     void ComboBoxThemeChanged(int newThemeIndex);
 
