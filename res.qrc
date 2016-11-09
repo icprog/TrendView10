@@ -22,5 +22,8 @@
         <file>expand3.ico</file>
         <file>1leftarrow_small.ico</file>
         <file>1rightarrow_small.ico</file>
+        <file>expand4.ico</file>
+        <file>collapse4.ico</file>
+        <file>2rightarrow_end.ico</file>
     </qresource>
 </RCC>

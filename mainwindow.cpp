@@ -18,7 +18,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    onlineTrend=true;
+
 
     connect(ui->buttonPrint,SIGNAL(clicked()),this,SLOT(ButtonPrint()));
     connect(ui->buttonSaveToFile,SIGNAL(clicked()),this,SLOT(ButtonSaveToFile()));
@@ -30,6 +30,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->button100Back,SIGNAL(clicked()),this,SLOT(Button100Back()));
     connect(ui->button50Forward,SIGNAL(clicked()),this,SLOT(Button50Forward()));
     connect(ui->button100Forward,SIGNAL(clicked()),this,SLOT(Button100Forward()));
+    connect(ui->buttonForwardToEnd,SIGNAL(clicked()),this,SLOT(ButtonForwardToEnd()));
 
     connect(ui->comboBoxTheme,SIGNAL(currentIndexChanged(int)),this,SLOT(ComboBoxThemeChanged(int)));
 
@@ -37,7 +38,13 @@ MainWindow::MainWindow(QWidget *parent) :
 
     useThread=true;
     loadThread.mw=this;
+    loadThread.pmtx=&m_mtx;
     connect(&loadThread,SIGNAL(backDayLoad()),this,SLOT(ThreadLoadDay()));
+    connect(&loadThread,SIGNAL(allBackDaysLoad()),this,SLOT(ThreadLoadAllBackDays()));
+    onlineThread.mw=this;
+    onlineThread.pmtx=&m_mtx;
+    connect(&onlineThread,SIGNAL(onlineDataLoad()),this,SLOT(ThreadLoadOnlineData()));
+
 
     ui->buttonPrint->setVisible(false);
     ui->buttonSaveToFile->setVisible(false);
@@ -45,6 +52,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // Инициализируем объект полотна для графика ...
     wGraphic = new QCustomPlot();
+
 
     // Инициализируем вертикальную линию - визир, порядок добавление соответствует порядку отрисовки
     // т.е. если визир и лэйбл добавлен после трендов, они будет поверх, иначе под трендами
@@ -234,7 +242,7 @@ MainWindow::MainWindow(QWidget *parent) :
         tr->labelColorBoxMax.setPalette(palette);
         tr->lineEditScaleMax.setMaximum(99999.0);
         tr->lineEditScaleMax.setMinimum(-99999.0);
-        tr->lineEditScaleMax.setSingleStep(1.0);
+        tr->lineEditScaleMax.setSingleStep((tr->max - tr->min)/50);
         tr->lineEditScaleMax.setDecimals(1);
         tr->lineEditScaleMax.setAlignment(Qt::AlignHCenter);
         tr->lineEditScaleMax.setValue(tr->max);
@@ -252,7 +260,7 @@ MainWindow::MainWindow(QWidget *parent) :
         tr->labelColorBoxMin.setPalette(palette);
         tr->lineEditScaleMin.setMaximum(99999.0);
         tr->lineEditScaleMin.setMinimum(-99999.0);
-        tr->lineEditScaleMin.setSingleStep(1.0);
+        tr->lineEditScaleMin.setSingleStep((tr->max - tr->min)/50);
         tr->lineEditScaleMin.setDecimals(1);
         tr->lineEditScaleMin.setAlignment(Qt::AlignHCenter);
         tr->lineEditScaleMin.setValue(tr->min);
@@ -284,9 +292,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
 
     // start load data - previous 2 hours
-    QDateTime dt_current=QDateTime::currentDateTime();
-    startLoadedDT=QDateTime::currentDateTime();
-
+    QDateTime dt_current=QDateTime::currentDateTime().addSecs(-5);
+    endLoadedDT=dt_current;
+    startLoadedDT=dt_current;
     AllTrendsAddFromToDay(dt_current.date(), QTime(0,0,0), dt_current.time());
 
 
@@ -330,6 +338,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
 
 
+    isOnlineTrend=true;
+    connect(&onlineTimer,SIGNAL(timeout()),this,SLOT(OnlineTrendTimer()));
+    onlineTimer.start(5000);
     //showFullScreen();
     //showMaximized();
 
@@ -441,10 +452,12 @@ void MainWindow::slotMouseMove(QMouseEvent *event)
         wGraphic->xAxis->setRange(currDT.toTime_t()-displayedInterval_sec,
                                   currDT.toTime_t());
         coordX_prev=coordX;
+        SetOnlineTrend(true);
     }
     else
     {
         wGraphic->xAxis->setRange(wGraphic->xAxis->range().lower -coordX+coordX_prev ,wGraphic->xAxis->range().upper -coordX+coordX_prev);
+        SetOnlineTrend(false);
     }
 
 
@@ -548,7 +561,7 @@ void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyDa
         }
         trend.close();
     }
-    if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
+
     *pyData << tmp_vect;
 }
 //==================================================================================
@@ -656,6 +669,7 @@ void MainWindow::AllTrendsAddFullDay(QDate date)
         TrendAddFullDay(tr->fileName,date,&(tr->yData));
         tr->graph->setData(xData,tr->yData);
     }
+    if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
 }
 //==================================================================================
 void MainWindow::AllTrendsAddFromToDay(QDate date, QTime timeFrom, QTime timeTo)
@@ -667,6 +681,8 @@ void MainWindow::AllTrendsAddFromToDay(QDate date, QTime timeFrom, QTime timeTo)
         TrendAddFromToDay(tr->fileName, date, timeFrom, timeTo, &(tr->yData));
         tr->graph->setData(xData,tr->yData);
     }
+
+    endLoadedDT = QDateTime(date,timeTo);
 }
 //==================================================================================
 
@@ -694,21 +710,72 @@ void CheckNeededBackDaysAndLoadThread::run()
 
         for(QDate dtToLoad=mw->startLoadedDT.date().addDays(-1);dtToLoad>=m_dateFrom;dtToLoad=dtToLoad.addDays(-1))
         {
+            pmtx->lock();
             mw->AllTrendsAddFullDay(dtToLoad);
+            pmtx->unlock();
             if (CheckThreadStop()) return;
 
             emit backDayLoad();
         }
 
     }
+    emit allBackDaysLoad();
 }
 //==================================================================================
 void MainWindow::ThreadLoadDay()
 {
-    qDebug() << "load1";
+    //qDebug() << "load1";
     RecalcGridInterval();
     wGraphic->replot();
-        qDebug() << "load22222";
+   //     qDebug() << "load22222";
+}
+//==================================================================================
+void MainWindow::ThreadLoadAllBackDays()
+{
+    ui->buttonCollapse->setEnabled(true);
+    ui->button50Back->setEnabled(true);
+    ui->button100Back->setEnabled(true);
+}
+//==================================================================================
+void MainWindow::DisableButtonsUntilLoadHistoryData()
+{
+    ui->buttonCollapse->setEnabled(false);
+    ui->button50Back->setEnabled(false);
+    ui->button100Back->setEnabled(false);
+}
+//==================================================================================
+void CheckOnlineDataAndLoadThread::run()
+{
+    pmtx->lock();
+
+    QDateTime currDT=QDateTime::currentDateTime();
+    currDT=currDT.addSecs(-5);
+
+    if (mw->endLoadedDT.date() == currDT.date())
+        mw->AllTrendsAddFromToDay(currDT.date(), mw->endLoadedDT.time(), currDT.time());
+
+    if (mw->endLoadedDT.date() < currDT.date())
+    {
+        mw->AllTrendsAddFromToDay(mw->endLoadedDT.date(), mw->endLoadedDT.time(), QTime(23,59,59));
+        mw->AllTrendsAddFromToDay(currDT.date(), QTime(0,0,0), currDT.time());
+    }
+
+
+    pmtx->unlock();
+
+    if (CheckThreadStop()) return;
+
+    emit onlineDataLoad();
+}
+//==================================================================================
+void MainWindow::ThreadLoadOnlineData()
+{
+    QDateTime currDT=QDateTime::currentDateTime();
+    displayedInterval_sec=wGraphic->xAxis->range().upper - wGraphic->xAxis->range().lower;
+    RecalcGridInterval();
+    wGraphic->xAxis->setRange(currDT.toTime_t()-displayedInterval_sec,
+                              currDT.toTime_t());
+    wGraphic->replot();
 }
 //==================================================================================
 void MainWindow::RecalcGridInterval()
@@ -733,6 +800,8 @@ void MainWindow::RecalcGridInterval()
 //=================================================================================
 void MainWindow::ButtonCollapse()
 {
+    DisableButtonsUntilLoadHistoryData();
+
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
 
     //displayedInterval_sec=displayedInterval_sec*2;
@@ -745,6 +814,7 @@ void MainWindow::ButtonCollapse()
 
         wGraphic->xAxis->setRange(currDT.toTime_t()-displayedInterval_sec*2,
                                   currDT.toTime_t());
+        SetOnlineTrend(true);
     }
     else
     {
@@ -793,6 +863,7 @@ void MainWindow::ButtonExpand()
     qDebug() << displayedInterval_sec;
 
 
+    SetOnlineTrend(false);
     ui->buttonCollapse->setEnabled(true);
 }
 //==================================================================================
@@ -806,6 +877,7 @@ void MainWindow::Button100Forward()
 
         wGraphic->xAxis->setRange(currDT.toTime_t()-displayedInterval_sec,
                                   currDT.toTime_t());
+        SetOnlineTrend(true);
     }
     else
     {
@@ -818,6 +890,8 @@ void MainWindow::Button100Forward()
 //==================================================================================
 void MainWindow::Button100Back()
 {
+    DisableButtonsUntilLoadHistoryData();
+
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
 
     wGraphic->xAxis->setRange(wGraphic->xAxis->range().lower-displayedInterval_sec,
@@ -833,7 +907,7 @@ void MainWindow::Button100Back()
         loadThread.SetDateFrom(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
         loadThread.start();
     }
-
+    SetOnlineTrend(false);
     wGraphic->replot();
 }
 //==================================================================================
@@ -847,6 +921,7 @@ void MainWindow::Button50Forward()
 
         wGraphic->xAxis->setRange(currDT.toTime_t()-displayedInterval_sec,
                                   currDT.toTime_t());
+        SetOnlineTrend(true);
     }
     else
     {
@@ -859,6 +934,8 @@ void MainWindow::Button50Forward()
 //==================================================================================
 void MainWindow::Button50Back()
 {
+    DisableButtonsUntilLoadHistoryData();
+
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
     wGraphic->xAxis->setRange(wGraphic->xAxis->range().lower-displayedInterval_sec/2,
                               wGraphic->xAxis->range().upper-displayedInterval_sec/2);
@@ -873,15 +950,18 @@ void MainWindow::Button50Back()
         loadThread.SetDateFrom(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
         loadThread.start();
     }
-
+    SetOnlineTrend(false);
     wGraphic->replot();
 }
 //==================================================================================
 void MainWindow::StartEndDateTimeChanged()
 {
+    DisableButtonsUntilLoadHistoryData();
+
     if (ui->dateTimeEditEnd->dateTime() > QDateTime::currentDateTime())
     {
         ui->dateTimeEditEnd->setDateTime(QDateTime::currentDateTime());
+        SetOnlineTrend(true);
     }
 
     wGraphic->xAxis->setRange(ui->dateTimeEditStart->dateTime().toTime_t(),
@@ -904,6 +984,35 @@ void MainWindow::StartEndDateTimeChanged()
     wGraphic->replot();
 
 }
+//==================================================================================
+void MainWindow::SetOnlineTrend(bool isOnline)
+{
+    isOnlineTrend=isOnline;
+    if (isOnlineTrend) onlineThread.start();
+
+    if (isOnlineTrend)
+    {
+        ui->labelIsOnline->setText(" Online");
+        ui->labelIsOnline->setStyleSheet("QLabel {\ncolor: green;\n}");
+    }
+    else
+    {
+        ui->labelIsOnline->setText("History");
+        ui->labelIsOnline->setStyleSheet("QLabel {\ncolor: red;\n}");
+    }
+}
+//===================================================================================
+void MainWindow::ButtonForwardToEnd()
+{
+    SetOnlineTrend(true);
+}
+//==================================================================================
+void MainWindow::OnlineTrendTimer()
+{
+    if (isOnlineTrend) onlineThread.start();
+}
+//==================================================================================
+
 //==================================================================================
 void MainWindow::GraphicXAxisRangeChanged(QCPRange newRange)
 {

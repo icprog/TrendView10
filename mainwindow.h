@@ -6,6 +6,7 @@
 #include <QDebug>
 #include <QVector>
 #include <QDate>
+#include <QTimer>
 
 #include "autostopthread.h"
 
@@ -76,22 +77,42 @@ public:
     virtual ~CheckNeededBackDaysAndLoadThread(){}
 private:
     QDate m_dateFrom;
-    QMutex m_mtx;
+
 public:
+    QMutex *pmtx;
+    MainWindow *mw;
+    virtual void run();
+    void SetDateFrom(QDate dateFrom)
+    {
+        pmtx->lock();
+        m_dateFrom=dateFrom;
+        pmtx->unlock();
+    }
+signals:
+    void backDayLoad();
+    void allBackDaysLoad();
+
+
+
+};
+
+
+class CheckOnlineDataAndLoadThread : public AutoStopThread
+{
+    Q_OBJECT
+public:
+    CheckOnlineDataAndLoadThread(){}
+    virtual ~CheckOnlineDataAndLoadThread(){}
+private:
+
+
+public:
+    QMutex *pmtx;
     MainWindow *mw;
     virtual void run();
 
-    void SetDateFrom(QDate dateFrom)
-    {
-        m_mtx.lock();
-        m_dateFrom=dateFrom;
-        m_mtx.unlock();
-    }
-
 signals:
-    void backDayLoad();
-
-
+    void onlineDataLoad();
 };
 
 
@@ -126,13 +147,17 @@ public:
 
     uint displayedInterval_sec;
 
-    bool onlineTrend;
+    bool isOnlineTrend;
+    QTimer onlineTimer;
 
     double coordX_prev;
 
     QVector<Trend *> trends;
 
+    QMutex m_mtx;
     CheckNeededBackDaysAndLoadThread loadThread;
+    CheckOnlineDataAndLoadThread onlineThread;
+
     bool useThread;  //if this set to true - using thread to load data
 
     void TrendAddFullDay(QString name, QDate date, QVector<double> *pyData);
@@ -145,6 +170,11 @@ public:
     void AllTrendsAddFromToDay(QDate date, QTime timeFrom, QTime timeTo);
 
     void CheckNeededBackDaysAndLoad(QDate dateFrom);
+
+    void SetOnlineTrend(bool isOnline);
+
+    void DisableButtonsUntilLoadHistoryData();
+
 
 
 private slots:
@@ -168,6 +198,12 @@ private slots:
     void ComboBoxThemeChanged(int newThemeIndex);
 
     void ThreadLoadDay();
+    void ThreadLoadAllBackDays();
+
+    void ThreadLoadOnlineData();
+
+    void ButtonForwardToEnd();
+    void OnlineTrendTimer();
 
 };
 
