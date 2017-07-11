@@ -137,6 +137,23 @@ MainWindow::MainWindow(QWidget *parent) :
     GetPrivateProfileStringA("Main","TrendFilesPath","",temp,512,iniName.toStdString().c_str());
     sTrendFilesPath=codec->toUnicode(temp);
 
+    if (sTrendFilesPath[0].isDigit())
+    {
+        trendType=TcpPort;
+        if (sTrendFilesPath.indexOf(':')<1)
+        {
+            QMessageBox::information(NULL,"error information","Error TrendFilesPath Format (must be IP:port)!!!");
+        }
+
+        serverIP=sTrendFilesPath.left(sTrendFilesPath.indexOf(':'));
+        serverPort=sTrendFilesPath.right(sTrendFilesPath.length() - sTrendFilesPath.indexOf(':') - 1).toInt();
+        //QMessageBox::information(NULL,serverIP,QString::number(serverPort)+"                     ");
+    }
+    else
+    {
+        trendType=SharedFolder;
+    }
+
     //GetPrivateProfileStringA("Main","Fullscreen","0",temp,512,QString(iniName).toStdString().c_str());
     //if (codec->toUnicode(temp)=="1") {showMaximized();}
 
@@ -524,80 +541,27 @@ void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyDa
     static float file_buff[17280];
     static QVector<double> tmp_vect(17280);
 
-    QString filename;
-
-    filename.sprintf("%s%s_%.2u_%.2u_%.4u.trn",sTrendFilesPath.toStdString().c_str(),name.toStdString().c_str(),date.day(),date.month(),date.year());
-
-    QFile trend(filename);
-
-   // buffer_position=(paint_trend_info->endHour*60*60+paint_trend_info->endMinute*60+paint_trend_info->endSecond-
-   //     paint_trend_info->startHour*60*60-paint_trend_info->startMinute*60-paint_trend_info->startSecond)/5;
-
-    if (!trend.open(QIODevice::ReadOnly))
+    if (trendType==SharedFolder)
     {
-        //for (int j=0;j<17280;j++) tmp_vect[j]=min_float;
-        tmp_vect.fill(qQNaN());
-    }
-    else
-    {
-        if (trend.read((char *)file_buff,17280*4))
-        {
-            for (int j=0;j<17280;j++)
-            {
-                if (file_buff[j]!=min_float)
-                {
-                    tmp_vect[j]=file_buff[j];
-                }
-                else
-                {
-                    tmp_vect[j]=qQNaN();
-                }
-            }
-        }
-        else
+        QString filename;
+
+        filename.sprintf("%s%s_%.2u_%.2u_%.4u.trn",sTrendFilesPath.toStdString().c_str(),name.toStdString().c_str(),date.day(),date.month(),date.year());
+
+        QFile trend(filename);
+
+       // buffer_position=(paint_trend_info->endHour*60*60+paint_trend_info->endMinute*60+paint_trend_info->endSecond-
+       //     paint_trend_info->startHour*60*60-paint_trend_info->startMinute*60-paint_trend_info->startSecond)/5;
+
+        if (!trend.open(QIODevice::ReadOnly))
         {
             //for (int j=0;j<17280;j++) tmp_vect[j]=min_float;
             tmp_vect.fill(qQNaN());
         }
-        trend.close();
-    }
-
-    *pyData << tmp_vect;
-}
-//==================================================================================
-void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pyData)
-{
-    static float file_buff[17280];
-    static QVector<double> tmp_vect;//(17280);
-
-    QString filename;
-
-    filename.sprintf("%s%s_%.2u_%.2u_%.4u.trn",sTrendFilesPath.toStdString().c_str(),name.toStdString().c_str(),date.day(),date.month(),date.year());
-
-    uint data_offset=(timeFrom.hour()*60*60 + timeFrom.minute()*60 + timeFrom.second()) / 5;
-
-    //количество 5-секундных срезов, помещающихся в интервал (+1 )
-    uint data_length=(timeTo.hour()*60*60 + timeTo.minute()*60 + timeTo.second())/5 - (timeFrom.hour()*60*60 + timeFrom.minute()*60 + timeFrom.second())/5 + 1;
-
-    tmp_vect.resize(data_length);
-
-    QFile trend(filename);
-
-   // buffer_position=(paint_trend_info->endHour*60*60+paint_trend_info->endMinute*60+paint_trend_info->endSecond-
-   //     paint_trend_info->startHour*60*60-paint_trend_info->startMinute*60-paint_trend_info->startSecond)/5;
-
-    if (!trend.open(QIODevice::ReadOnly))
-    {
-        //for (int j=0;j<17280;j++) tmp_vect[j]=min_float;
-        tmp_vect.fill(qQNaN());
-    }
-    else
-    {
-        if (trend.seek(data_offset*4))
+        else
         {
-            if (trend.read((char *)file_buff,data_length*4))
+            if (trend.read((char *)file_buff,17280*4))
             {
-                for (uint j=0;j<data_length;j++)
+                for (int j=0;j<17280;j++)
                 {
                     if (file_buff[j]!=min_float)
                     {
@@ -614,14 +578,203 @@ void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTi
                 //for (int j=0;j<17280;j++) tmp_vect[j]=min_float;
                 tmp_vect.fill(qQNaN());
             }
+            trend.close();
         }
-        else
+    }
+    else //trendType==TcpPort
+    {
+        if (socket.state()!=QTcpSocket::ConnectedState)
+        {
+            socket.connectToHost(serverIP, serverPort);
+            socket.waitForConnected(1000);  //true if connected
+        }
+
+        if (socket.state()==QTcpSocket::ConnectedState)
+        {
+            //if connected succesfully
+            trend_query_struct trend_query;
+            strcpy(trend_query.fileName,name.toStdString().c_str());
+            trend_query.year=date.year();
+            trend_query.month=date.month();
+            trend_query.day=date.day();
+            trend_query.hour=0;
+            trend_query.minute=0;
+            trend_query.second=0;
+            trend_query.count=17280;
+
+            int result;
+            result=socket.write((char *)&trend_query,sizeof(trend_query));
+
+            if (result!=SOCKET_ERROR)
+            {
+                uint read_bytes_count=0;
+                while(read_bytes_count<17280*4)
+                {
+                    socket.waitForReadyRead(500);
+                    result=socket.read( &(((char *)file_buff)[read_bytes_count]) ,17280*4);
+                    if (result<0)
+                    {
+                        //fill end with min_float
+                        for(int i=read_bytes_count/4;i<17280;++i)
+                        {
+                            file_buff[i]=min_float;
+                        }
+                        socket.disconnectFromHost();
+                        break;
+
+                    }
+                    else
+                    {
+                        read_bytes_count+=result;
+                    }
+                }
+
+                //read all
+                for (int j=0;j<17280;j++)
+                {
+                    if (file_buff[j]!=min_float)
+                    {
+                        tmp_vect[j]=file_buff[j];
+                    }
+                    else
+                    {
+                        tmp_vect[j]=qQNaN();
+                    }
+                }
+
+            }
+
+        }
+    }
+    *pyData << tmp_vect;
+}
+//==================================================================================
+void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pyData)
+{
+    static float file_buff[17280];
+    static QVector<double> tmp_vect;//(17280);
+
+    uint data_offset=(timeFrom.hour()*60*60 + timeFrom.minute()*60 + timeFrom.second()) / 5;
+
+    //количество 5-секундных срезов, помещающихся в интервал (+1 )
+    uint data_length=(timeTo.hour()*60*60 + timeTo.minute()*60 + timeTo.second())/5 - (timeFrom.hour()*60*60 + timeFrom.minute()*60 + timeFrom.second())/5 + 1;
+
+    tmp_vect.resize(data_length);
+
+    if (trendType==SharedFolder)
+    {
+        QString filename;
+
+        filename.sprintf("%s%s_%.2u_%.2u_%.4u.trn",sTrendFilesPath.toStdString().c_str(),name.toStdString().c_str(),date.day(),date.month(),date.year());
+
+        QFile trend(filename);
+
+       // buffer_position=(paint_trend_info->endHour*60*60+paint_trend_info->endMinute*60+paint_trend_info->endSecond-
+       //     paint_trend_info->startHour*60*60-paint_trend_info->startMinute*60-paint_trend_info->startSecond)/5;
+
+        if (!trend.open(QIODevice::ReadOnly))
         {
             //for (int j=0;j<17280;j++) tmp_vect[j]=min_float;
             tmp_vect.fill(qQNaN());
         }
-        trend.close();
+        else
+        {
+            if (trend.seek(data_offset*4))
+            {
+                if (trend.read((char *)file_buff,data_length*4))
+                {
+                    for (uint j=0;j<data_length;j++)
+                    {
+                        if (file_buff[j]!=min_float)
+                        {
+                            tmp_vect[j]=file_buff[j];
+                        }
+                        else
+                        {
+                            tmp_vect[j]=qQNaN();
+                        }
+                    }
+                }
+                else
+                {
+                    //for (int j=0;j<17280;j++) tmp_vect[j]=min_float;
+                    tmp_vect.fill(qQNaN());
+                }
+            }
+            else
+            {
+                //for (int j=0;j<17280;j++) tmp_vect[j]=min_float;
+                tmp_vect.fill(qQNaN());
+            }
+            trend.close();
+        }
     }
+    else //trendType==TcpPort
+    {
+        if (socket.state()!=QTcpSocket::ConnectedState)
+        {
+            socket.connectToHost(serverIP, serverPort);
+            socket.waitForConnected(1000);  //true if connected
+        }
+
+        if (socket.state()==QTcpSocket::ConnectedState)
+        {
+            //if connected succesfully
+            trend_query_struct trend_query;
+            strcpy(trend_query.fileName,name.toStdString().c_str());
+            trend_query.year=date.year();
+            trend_query.month=date.month();
+            trend_query.day=date.day();
+            trend_query.hour=timeFrom.hour();
+            trend_query.minute=timeFrom.minute();
+            trend_query.second=timeFrom.second();
+            trend_query.count=data_length;
+
+            int result;
+            result=socket.write((char *)&trend_query,sizeof(trend_query));
+
+            if (result!=SOCKET_ERROR)
+            {
+                uint read_bytes_count=0;
+                while(read_bytes_count<data_length*4)
+                {
+                    socket.waitForReadyRead(500);
+                    result=socket.read( &(((char *)file_buff)[read_bytes_count]) ,data_length*4);
+                    if (result<0)
+                    {
+                        //fill end with min_float
+                        for(int i=read_bytes_count/4;i<data_length;++i)
+                        {
+                            file_buff[i]=min_float;
+                        }
+                        socket.disconnectFromHost();
+                        break;
+
+                    }
+                    else
+                    {
+                        read_bytes_count+=result;
+                    }
+                }
+
+                //read all
+                for (int j=0;j<data_length;j++)
+                {
+                    if (file_buff[j]!=min_float)
+                    {
+                        tmp_vect[j]=file_buff[j];
+                    }
+                    else
+                    {
+                        tmp_vect[j]=qQNaN();
+                    }
+                }
+
+            }
+
+        }
+    }
+
     if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
     *pyData << tmp_vect;
 }

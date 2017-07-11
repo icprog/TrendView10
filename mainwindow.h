@@ -7,6 +7,7 @@
 #include <QVector>
 #include <QDate>
 #include <QTimer>
+#include <QTcpSocket>
 
 #include "autostopthread.h"
 
@@ -16,9 +17,28 @@ class MainWindow;
 }
 
 class MainWindow;
-
+//=============================================================================
 //class CheckNeededBackDaysAndLoadThread;
+enum TrendType
+{
+    SharedFolder=0,
+    TcpPort,
+};
 
+//=============================================================================
+struct trend_query_struct
+{
+    char fileName[32];
+    int year;
+    int month;
+    int day;
+    int hour;
+    int minute;
+    int second;
+    int count;
+};
+
+//===============================================================================
 
 class Trend : public QObject
 {
@@ -36,6 +56,7 @@ public:
         delete yAxis;
         delete tracer;
     }
+
 
     QCustomPlot *plot;
 
@@ -68,7 +89,7 @@ public slots:
     void checkBoxChanged(bool newValue){graph->setVisible(newValue);plot->replot();}
 
 };
-
+//======================================================================================
 class CheckNeededBackDaysAndLoadThread : public AutoStopThread
 {
     Q_OBJECT
@@ -96,7 +117,7 @@ signals:
 
 };
 
-
+//=======================================================================================
 class CheckOnlineDataAndLoadThread : public AutoStopThread
 {
     Q_OBJECT
@@ -115,7 +136,7 @@ signals:
     void onlineDataLoad();
 };
 
-
+//===========================================================================================
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -126,6 +147,11 @@ public:
 
     void RecalcGridInterval();
     void OnlineRepaint();
+
+    TrendType trendType;
+    QString serverIP;
+    uint serverPort;
+    QTcpSocket socket;
 
 //private:
     Ui::MainWindow *ui;
