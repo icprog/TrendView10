@@ -365,6 +365,7 @@ MainWindow::MainWindow(QWidget *parent) :
 //============================================================
 MainWindow::~MainWindow()
 {
+
     xData.clear();
 
     foreach(Trend *tr, trends)
@@ -375,6 +376,7 @@ MainWindow::~MainWindow()
     //delete vizirLine;
     delete wGraphic;
     delete ui;
+
 }
 //=========================================================================================================
 //=========================================================================================================
@@ -450,6 +452,7 @@ void MainWindow::slotMouseMove(QMouseEvent *event)
      * то вызываем отработку координат мыши
      * через слот клика
      * */
+
     if(event->buttons() & Qt::LeftButton) slotMousePress(event);
 
 
@@ -538,6 +541,8 @@ void MainWindow::ButtonSaveToFile()
 //=================================================================================
 void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyData)
 {
+
+
     static float file_buff[17280];
     static QVector<double> tmp_vect(17280);
 
@@ -647,10 +652,12 @@ void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyDa
         }
     }
     *pyData << tmp_vect;
+
 }
 //==================================================================================
 void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pyData)
 {
+
     static float file_buff[17280];
     static QVector<double> tmp_vect;//(17280);
 
@@ -777,10 +784,12 @@ void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTi
 
     if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
     *pyData << tmp_vect;
+
 }
 //==================================================================================
 void MainWindow::XAxisAddFullDay(QDate date, QVector<double> *pxData)
 {
+
     static QVector<double> tmp_vect(17280);
     QDateTime tmp_dt(date);
 
@@ -790,10 +799,12 @@ void MainWindow::XAxisAddFullDay(QDate date, QVector<double> *pxData)
         tmp_dt=tmp_dt.addSecs(5);
     }
     *pxData << tmp_vect;
+
 }
 //==================================================================================
 void MainWindow::XAxisAddFromToDay(QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pxData)
 {
+
     static QVector<double> tmp_vect(17280);
     QDateTime tmp_dt(date,timeFrom);
 
@@ -811,6 +822,7 @@ void MainWindow::XAxisAddFromToDay(QDate date, QTime timeFrom, QTime timeTo, QVe
         tmp_dt=tmp_dt.addSecs(5);
     }
     *pxData << tmp_vect;
+
 }
 
 //==================================================================================
@@ -841,8 +853,9 @@ void MainWindow::AllTrendsAddFromToDay(QDate date, QTime timeFrom, QTime timeTo)
 
 void MainWindow::CheckNeededBackDaysAndLoad(QDate dateFrom)
 {
-    static QMutex mtx;
-    mtx.lock();
+
+    //static QMutex mtx;
+    //mtx.lock();
 
     if (startLoadedDT.date() > dateFrom)
     {
@@ -852,34 +865,44 @@ void MainWindow::CheckNeededBackDaysAndLoad(QDate dateFrom)
         }
 
     }
+    //mtx.unlock();
 
-    mtx.unlock();
+
 }
 //==================================================================================
 void CheckNeededBackDaysAndLoadThread::run()
 {
-    if (mw->startLoadedDT.date() > m_dateFrom)
+    if (pmtx->tryLock())
     {
 
-        for(QDate dtToLoad=mw->startLoadedDT.date().addDays(-1);dtToLoad>=m_dateFrom;dtToLoad=dtToLoad.addDays(-1))
+        if (mw->startLoadedDT.date() > m_dateFrom)
         {
-            pmtx->lock();
-            mw->AllTrendsAddFullDay(dtToLoad);
-            pmtx->unlock();
-            if (CheckThreadStop()) return;
 
-            emit backDayLoad();
+            for(QDate dtToLoad=mw->startLoadedDT.date().addDays(-1);dtToLoad>=m_dateFrom;dtToLoad=dtToLoad.addDays(-1))
+            {
+
+                    mw->AllTrendsAddFullDay(dtToLoad);
+                    emit backDayLoad();
+
+                if (CheckThreadStop()) return;
+
+
+            }
+
         }
-
+        emit allBackDaysLoad();
+        pmtx->unlock();
     }
-    emit allBackDaysLoad();
+
 }
 //==================================================================================
 void MainWindow::ThreadLoadDay()
 {
+
     //qDebug() << "load1";
     RecalcGridInterval();
     wGraphic->replot();
+
    //     qDebug() << "load22222";
 }
 //==================================================================================
@@ -899,26 +922,27 @@ void MainWindow::DisableButtonsUntilLoadHistoryData()
 //==================================================================================
 void CheckOnlineDataAndLoadThread::run()
 {
-    pmtx->lock();
-
-    QDateTime currDT=QDateTime::currentDateTime();
-    currDT=currDT.addSecs(-5);
-
-    if (mw->endLoadedDT.date() == currDT.date())
-        mw->AllTrendsAddFromToDay(currDT.date(), mw->endLoadedDT.time(), currDT.time());
-
-    if (mw->endLoadedDT.date() < currDT.date())
+    if (pmtx->tryLock())
     {
-        mw->AllTrendsAddFromToDay(mw->endLoadedDT.date(), mw->endLoadedDT.time(), QTime(23,59,59));
-        mw->AllTrendsAddFromToDay(currDT.date(), QTime(0,0,0), currDT.time());
+
+        QDateTime currDT=QDateTime::currentDateTime();
+        currDT=currDT.addSecs(-5);
+
+        if (mw->endLoadedDT.date() == currDT.date())
+            mw->AllTrendsAddFromToDay(currDT.date(), mw->endLoadedDT.time(), currDT.time());
+
+        if (mw->endLoadedDT.date() < currDT.date())
+        {
+            mw->AllTrendsAddFromToDay(mw->endLoadedDT.date(), mw->endLoadedDT.time(), QTime(23,59,59));
+            mw->AllTrendsAddFromToDay(currDT.date(), QTime(0,0,0), currDT.time());
+        }
+        emit onlineDataLoad();
+        pmtx->unlock();
     }
-
-
-    pmtx->unlock();
 
     if (CheckThreadStop()) return;
 
-    emit onlineDataLoad();
+
 }
 //==================================================================================
 void MainWindow::ThreadLoadOnlineData()
@@ -953,6 +977,7 @@ void MainWindow::RecalcGridInterval()
 //=================================================================================
 void MainWindow::ButtonCollapse()
 {
+    ui->buttonCollapse->setEnabled(false);
     DisableButtonsUntilLoadHistoryData();
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
@@ -993,12 +1018,16 @@ void MainWindow::ButtonCollapse()
     RecalcGridInterval();
     wGraphic->replot();
 
+    ui->buttonCollapse->setEnabled(true);
     ui->buttonExpand->setEnabled(true);
 
 }
 //==================================================================================
 void MainWindow::ButtonExpand()
 {
+    ui->buttonExpand->setEnabled(false);
+
+
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
 
     //displayedInterval_sec=displayedInterval_sec/2;
@@ -1017,11 +1046,15 @@ void MainWindow::ButtonExpand()
 
 
     SetOnlineTrend(false);
+    ui->buttonExpand->setEnabled(true);
     ui->buttonCollapse->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button100Forward()
 {
+    ui->button100Forward->setEnabled(false);
+
+
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
     QDateTime currDT=QDateTime::currentDateTime();
 
@@ -1039,11 +1072,14 @@ void MainWindow::Button100Forward()
     }
 
     wGraphic->replot();
+    ui->button100Forward->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button100Back()
 {
+    ui->button100Back->setEnabled(false);
     DisableButtonsUntilLoadHistoryData();
+
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
 
@@ -1062,10 +1098,14 @@ void MainWindow::Button100Back()
     }
     SetOnlineTrend(false);
     wGraphic->replot();
+    ui->button100Back->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button50Forward()
 {
+    ui->button50Forward->setEnabled(false);
+
+
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
     QDateTime currDT=QDateTime::currentDateTime();
 
@@ -1083,11 +1123,14 @@ void MainWindow::Button50Forward()
     }
 
     wGraphic->replot();
+    ui->button100Forward->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button50Back()
 {
+    ui->button50Back->setEnabled(false);
     DisableButtonsUntilLoadHistoryData();
+
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
     wGraphic->xAxis->setRange(wGraphic->xAxis->range().lower-displayedInterval_sec/2,
@@ -1105,6 +1148,7 @@ void MainWindow::Button50Back()
     }
     SetOnlineTrend(false);
     wGraphic->replot();
+    ui->button50Back->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::StartEndDateTimeChanged()
