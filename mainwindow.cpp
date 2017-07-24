@@ -36,16 +36,18 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(ui->buttonClose,SIGNAL(clicked()),this,SLOT(close()));
 
-    useThread=false;
+    //useThread=false;    -- remove to .h
 
-    loadThread.mw=this;
-    loadThread.pmtx=&m_mtx;
-    connect(&loadThread,SIGNAL(backDayLoad()),this,SLOT(ThreadLoadDay()));
-    connect(&loadThread,SIGNAL(allBackDaysLoad()),this,SLOT(ThreadLoadAllBackDays()));
-    onlineThread.mw=this;
-    onlineThread.pmtx=&m_mtx;
-    connect(&onlineThread,SIGNAL(onlineDataLoad()),this,SLOT(ThreadLoadOnlineData()));
-
+    if (useThread)
+    {
+        loadThread.mw=this;
+        loadThread.pmtx=&m_mtx;
+        connect(&loadThread,SIGNAL(backDayLoad()),this,SLOT(ThreadLoadDay()));
+        connect(&loadThread,SIGNAL(allBackDaysLoad()),this,SLOT(ThreadLoadAllBackDays()));
+        onlineThread.mw=this;
+        onlineThread.pmtx=&m_mtx;
+        connect(&onlineThread,SIGNAL(onlineDataLoad()),this,SLOT(ThreadLoadOnlineData()));
+    }
 
     ui->buttonPrint->setVisible(false);
     ui->buttonSaveToFile->setVisible(false);
@@ -907,10 +909,12 @@ void MainWindow::ThreadLoadDay()
 void MainWindow::ThreadLoadAllBackDays()
 {
     RecalcGridInterval();
+    m_mtx.lock();
     wGraphic->replot();
-    ui->buttonCollapse->setEnabled(true);
-    ui->button50Back->setEnabled(true);
-    ui->button100Back->setEnabled(true);
+    m_mtx.unlock();
+    //ui->buttonCollapse->setEnabled(true);
+    //ui->button50Back->setEnabled(true);
+    //ui->button100Back->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::DisableButtonsUntilLoadHistoryData()
@@ -940,7 +944,7 @@ void CheckOnlineDataAndLoadThread::run()
         pmtx->unlock();
     }
 
-    if (CheckThreadStop()) return;
+    //if (CheckThreadStop()) return;
 
 
 }
@@ -952,7 +956,9 @@ void MainWindow::ThreadLoadOnlineData()
     RecalcGridInterval();
     wGraphic->xAxis->setRange(currDT.toTime_t()-displayedInterval_sec,
                               currDT.toTime_t());
+    m_mtx.lock();
     wGraphic->replot();
+    m_mtx.unlock();
 }
 //==================================================================================
 void MainWindow::RecalcGridInterval()
@@ -977,8 +983,8 @@ void MainWindow::RecalcGridInterval()
 //=================================================================================
 void MainWindow::ButtonCollapse()
 {
-    ui->buttonCollapse->setEnabled(false);
-    DisableButtonsUntilLoadHistoryData();
+    //ui->buttonCollapse->setEnabled(false);
+    //DisableButtonsUntilLoadHistoryData();
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
 
@@ -1018,14 +1024,14 @@ void MainWindow::ButtonCollapse()
     RecalcGridInterval();
     wGraphic->replot();
 
-    ui->buttonCollapse->setEnabled(true);
+    //ui->buttonCollapse->setEnabled(true);
     ui->buttonExpand->setEnabled(true);
 
 }
 //==================================================================================
 void MainWindow::ButtonExpand()
 {
-    ui->buttonExpand->setEnabled(false);
+    //ui->buttonExpand->setEnabled(false);
 
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
@@ -1046,13 +1052,13 @@ void MainWindow::ButtonExpand()
 
 
     SetOnlineTrend(false);
-    ui->buttonExpand->setEnabled(true);
-    ui->buttonCollapse->setEnabled(true);
+    //ui->buttonExpand->setEnabled(true);
+    //ui->buttonCollapse->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button100Forward()
 {
-    ui->button100Forward->setEnabled(false);
+    //ui->button100Forward->setEnabled(false);
 
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
@@ -1072,13 +1078,13 @@ void MainWindow::Button100Forward()
     }
 
     wGraphic->replot();
-    ui->button100Forward->setEnabled(true);
+    //ui->button100Forward->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button100Back()
 {
-    ui->button100Back->setEnabled(false);
-    DisableButtonsUntilLoadHistoryData();
+    //ui->button100Back->setEnabled(false);
+    //DisableButtonsUntilLoadHistoryData();
 
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
@@ -1098,12 +1104,12 @@ void MainWindow::Button100Back()
         loadThread.start();
     }
     SetOnlineTrend(false);
-    ui->button100Back->setEnabled(true);
+    //ui->button100Back->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button50Forward()
 {
-    ui->button50Forward->setEnabled(false);
+    //ui->button50Forward->setEnabled(false);
 
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
@@ -1123,13 +1129,13 @@ void MainWindow::Button50Forward()
     }
 
     wGraphic->replot();
-    ui->button100Forward->setEnabled(true);
+    //ui->button100Forward->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::Button50Back()
 {
-    ui->button50Back->setEnabled(false);
-    DisableButtonsUntilLoadHistoryData();
+    //ui->button50Back->setEnabled(false);
+    //DisableButtonsUntilLoadHistoryData();
 
 
     displayedInterval_sec=wGraphic->xAxis->range().upper-wGraphic->xAxis->range().lower;
@@ -1148,12 +1154,12 @@ void MainWindow::Button50Back()
         loadThread.start();
     }
     SetOnlineTrend(false);
-    ui->button50Back->setEnabled(true);
+    //ui->button50Back->setEnabled(true);
 }
 //==================================================================================
 void MainWindow::StartEndDateTimeChanged()
 {
-    DisableButtonsUntilLoadHistoryData();
+    //DisableButtonsUntilLoadHistoryData();
 
     if (ui->dateTimeEditEnd->dateTime() > QDateTime::currentDateTime())
     {
@@ -1206,7 +1212,7 @@ void MainWindow::ButtonForwardToEnd()
 //==================================================================================
 void MainWindow::OnlineTrendTimer()
 {
-    if (isOnlineTrend) onlineThread.start();
+    if (isOnlineTrend && !loadThread.isRunning()) onlineThread.start();
 }
 //==================================================================================
 

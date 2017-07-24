@@ -16,11 +16,13 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    qcustomplot.cpp
+    qcustomplot.cpp \
+    datareceiver.cpp
 
 HEADERS  += mainwindow.h \
     qcustomplot.h \
-    autostopthread.h
+    autostopthread.h \
+    datareceiver.h
 
 FORMS    += mainwindow.ui
 

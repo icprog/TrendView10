@@ -185,7 +185,7 @@ public:
     CheckNeededBackDaysAndLoadThread loadThread;
     CheckOnlineDataAndLoadThread onlineThread;
 
-    bool useThread;  //if this set to true - using thread to load data
+    static constexpr bool useThread=true;  //if this set to true - using thread to load data
 
     void TrendAddFullDay(QString name, QDate date, QVector<double> *pyData);
     void TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pyData);
