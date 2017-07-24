@@ -506,9 +506,9 @@ void MainWindow::slotMouseMove(QMouseEvent *event)
 
 
 
-        qDebug() << "x: " + QString::number(coordX) +
-                    " x_prev: " + QString::number(coordX_prev)+
-                    " disb: " + QString::number(-coordX_prev+coordX);
+        //qDebug() << "x: " + QString::number(coordX) +
+        //            " x_prev: " + QString::number(coordX_prev)+
+        //            " disb: " + QString::number(-coordX_prev+coordX);
 
 
 
@@ -773,7 +773,7 @@ void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTi
                     {
                         tmp_vect[j]=qQNaN();
                     }
-                    qDebug() << name << "  -- " << file_buff[j];
+                    //qDebug() << name << "  -- " << file_buff[j];
                 }
 
             }
@@ -1048,7 +1048,7 @@ void MainWindow::ButtonExpand()
 
     if (displayedInterval_sec<60) ui->buttonExpand->setEnabled(false);
 
-    qDebug() << displayedInterval_sec;
+    //qDebug() << displayedInterval_sec;
 
 
     SetOnlineTrend(false);
