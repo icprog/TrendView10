@@ -36,7 +36,8 @@ MainWindow::MainWindow(QWidget *parent) :
 
     connect(ui->buttonClose,SIGNAL(clicked()),this,SLOT(close()));
 
-    useThread=true;
+    useThread=false;
+
     loadThread.mw=this;
     loadThread.pmtx=&m_mtx;
     connect(&loadThread,SIGNAL(backDayLoad()),this,SLOT(ThreadLoadDay()));
@@ -493,6 +494,7 @@ void MainWindow::slotMouseMove(QMouseEvent *event)
         if (!useThread)
         {
             CheckNeededBackDaysAndLoad(startDisplayedDT.date());
+            wGraphic->replot(); // Перерисовываем содержимое полотна графика
         }
         else
         {
@@ -502,19 +504,12 @@ void MainWindow::slotMouseMove(QMouseEvent *event)
 
 
 
-        /*
-        ui->lineEdit->setText("x: " + QString::number(coordX) +
-                              " x_prev: " + QString::number(coordX_prev)+
-                              " disb: " + QString::number(-coordX_prev+coordX));
-
-        */
-
         qDebug() << "x: " + QString::number(coordX) +
                     " x_prev: " + QString::number(coordX_prev)+
                     " disb: " + QString::number(-coordX_prev+coordX);
 
 
-        wGraphic->replot(); // Перерисовываем содержимое полотна графика
+
 
         //coordX_prev=coordX;
     }
@@ -588,11 +583,11 @@ void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyDa
     }
     else //trendType==TcpPort
     {
-        if (socket.state()!=QTcpSocket::ConnectedState)
-        {
+        //if (socket.state()!=QTcpSocket::ConnectedState)
+        //{
             socket.connectToHost(serverIP, serverPort);
             socket.waitForConnected(1000);  //true if connected
-        }
+        //}
 
         if (socket.state()==QTcpSocket::ConnectedState)
         {
@@ -650,6 +645,7 @@ void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyDa
             }
 
         }
+        socket.disconnectFromHost();
     }
     *pyData << tmp_vect;
 
@@ -718,11 +714,11 @@ void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTi
     }
     else //trendType==TcpPort
     {
-        if (socket.state()!=QTcpSocket::ConnectedState)
-        {
+        //if (socket.state()!=QTcpSocket::ConnectedState)
+        //{
             socket.connectToHost(serverIP, serverPort);
             socket.waitForConnected(1000);  //true if connected
-        }
+        //}
 
         if (socket.state()==QTcpSocket::ConnectedState)
         {
@@ -775,11 +771,13 @@ void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTi
                     {
                         tmp_vect[j]=qQNaN();
                     }
+                    qDebug() << name << "  -- " << file_buff[j];
                 }
 
             }
 
         }
+        socket.disconnectFromHost();
     }
 
     if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
@@ -900,14 +898,16 @@ void MainWindow::ThreadLoadDay()
 {
 
     //qDebug() << "load1";
-    RecalcGridInterval();
-    wGraphic->replot();
+    //RecalcGridInterval();
+    //wGraphic->replot();
 
    //     qDebug() << "load22222";
 }
 //==================================================================================
 void MainWindow::ThreadLoadAllBackDays()
 {
+    RecalcGridInterval();
+    wGraphic->replot();
     ui->buttonCollapse->setEnabled(true);
     ui->button50Back->setEnabled(true);
     ui->button100Back->setEnabled(true);
@@ -1090,6 +1090,7 @@ void MainWindow::Button100Back()
     if (!useThread)
     {
         CheckNeededBackDaysAndLoad(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
+        wGraphic->replot();
     }
     else
     {
@@ -1097,7 +1098,6 @@ void MainWindow::Button100Back()
         loadThread.start();
     }
     SetOnlineTrend(false);
-    wGraphic->replot();
     ui->button100Back->setEnabled(true);
 }
 //==================================================================================
@@ -1140,6 +1140,7 @@ void MainWindow::Button50Back()
     if (!useThread)
     {
         CheckNeededBackDaysAndLoad(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
+        wGraphic->replot();
     }
     else
     {
@@ -1147,7 +1148,6 @@ void MainWindow::Button50Back()
         loadThread.start();
     }
     SetOnlineTrend(false);
-    wGraphic->replot();
     ui->button50Back->setEnabled(true);
 }
 //==================================================================================
@@ -1170,6 +1170,7 @@ void MainWindow::StartEndDateTimeChanged()
     if (!useThread)
     {
         CheckNeededBackDaysAndLoad(QDateTime::fromTime_t(wGraphic->xAxis->range().lower).date());
+        wGraphic->replot();
     }
     else
     {
@@ -1178,7 +1179,6 @@ void MainWindow::StartEndDateTimeChanged()
     }
 
     RecalcGridInterval();
-    wGraphic->replot();
 
 }
 //==================================================================================
