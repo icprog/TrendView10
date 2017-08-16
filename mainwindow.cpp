@@ -369,7 +369,7 @@ MainWindow::MainWindow(QWidget *parent) :
 MainWindow::~MainWindow()
 {
 
-    xData.clear();
+    //xData.clear();
 
     foreach(Trend *tr, trends)
     {
@@ -536,12 +536,12 @@ void MainWindow::ButtonSaveToFile()
 
 }
 //=================================================================================
-void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyData)
+QVector<double> MainWindow::TrendAddFullDay(QString name, QDate date)
 {
 
 
-    static float file_buff[17280];
-    static QVector<double> tmp_vect(17280);
+    float file_buff[17280];
+    QVector<double> tmp_vect(17280);
 
     if (trendType==SharedFolder)
     {
@@ -649,15 +649,15 @@ void MainWindow::TrendAddFullDay(QString name, QDate date, QVector<double> *pyDa
         }
         socket.disconnectFromHost();
     }
-    *pyData << tmp_vect;
+    return tmp_vect;
 
 }
 //==================================================================================
-void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pyData)
+QVector<double> MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo)
 {
 
-    static float file_buff[17280];
-    static QVector<double> tmp_vect;//(17280);
+    float file_buff[17280];
+    QVector<double> tmp_vect;//(17280);
 
     uint data_offset=(timeFrom.hour()*60*60 + timeFrom.minute()*60 + timeFrom.second()) / 5;
 
@@ -783,14 +783,14 @@ void MainWindow::TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTi
     }
 
     if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
-    *pyData << tmp_vect;
+    return tmp_vect;
 
 }
 //==================================================================================
-void MainWindow::XAxisAddFullDay(QDate date, QVector<double> *pxData)
+QVector<double> MainWindow::XAxisAddFullDay(QDate date)
 {
 
-    static QVector<double> tmp_vect(17280);
+    QVector<double> tmp_vect(17280);
     QDateTime tmp_dt(date);
 
     for(int j=0;j<17280;++j)
@@ -798,14 +798,14 @@ void MainWindow::XAxisAddFullDay(QDate date, QVector<double> *pxData)
         tmp_vect[j]=tmp_dt.toTime_t();
         tmp_dt=tmp_dt.addSecs(5);
     }
-    *pxData << tmp_vect;
+    return tmp_vect;
 
 }
 //==================================================================================
-void MainWindow::XAxisAddFromToDay(QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pxData)
+QVector<double> MainWindow::XAxisAddFromToDay(QDate date, QTime timeFrom, QTime timeTo)
 {
 
-    static QVector<double> tmp_vect(17280);
+    QVector<double> tmp_vect(17280);
     QDateTime tmp_dt(date,timeFrom);
 
     uint data_offset=(timeFrom.hour()*60*60 + timeFrom.minute()*60 + timeFrom.second()) / 5;
@@ -821,30 +821,30 @@ void MainWindow::XAxisAddFromToDay(QDate date, QTime timeFrom, QTime timeTo, QVe
         tmp_vect[j]=tmp_dt.toTime_t();
         tmp_dt=tmp_dt.addSecs(5);
     }
-    *pxData << tmp_vect;
+    return tmp_vect;
 
 }
 
 //==================================================================================
 void MainWindow::AllTrendsAddFullDay(QDate date)
 {
-    XAxisAddFullDay(date,&xData);
+    QVector<double> xData= XAxisAddFullDay(date);
     foreach(Trend *tr,trends)
     {
-        TrendAddFullDay(tr->fileName,date,&(tr->yData));
-        tr->graph->setData(xData,tr->yData);
+        QVector<double> yData = TrendAddFullDay(tr->fileName,date);
+        tr->graph->addData(xData,yData);
     }
     if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
 }
 //==================================================================================
 void MainWindow::AllTrendsAddFromToDay(QDate date, QTime timeFrom, QTime timeTo)
 {
-    XAxisAddFromToDay(date, timeFrom, timeTo, &xData);
+    QVector<double> xData = XAxisAddFromToDay(date, timeFrom, timeTo);
 
     foreach(Trend *tr,trends)
     {
-        TrendAddFromToDay(tr->fileName, date, timeFrom, timeTo, &(tr->yData));
-        tr->graph->setData(xData,tr->yData);
+        QVector<double> yData = TrendAddFromToDay(tr->fileName, date, timeFrom, timeTo);
+        tr->graph->addData(xData,yData);
     }
 
     endLoadedDT = QDateTime(date,timeTo);

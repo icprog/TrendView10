@@ -52,7 +52,7 @@ public:
 
     virtual ~Trend()
     {
-        yData.clear();
+        //yData.clear();
         delete yAxis;
         delete tracer;
     }
@@ -68,7 +68,7 @@ public:
     QCPAxis *yAxis;
     QCPGraph *graph;
     QCPItemTracer *tracer;      // Трасировщик по точкам графика
-    QVector<double> yData;
+    //QVector<double> yData;
 
     QColor color;
     QLabel labelColorBox;
@@ -164,7 +164,7 @@ public:
     QCPCurve *vizirLine;     // Объявляем объект для вертикальной линии
     QCPItemText *vizirLabel;
     //double mouse_coordX_prev;
-    QVector<double> xData;
+    //QVector<double> xData;
 
     QDateTime startLoadedDT; //диапазон загруженных данных
     QDateTime endLoadedDT;
@@ -187,11 +187,11 @@ public:
 
     static constexpr bool useThread=true;  //if this set to true - using thread to load data
 
-    void TrendAddFullDay(QString name, QDate date, QVector<double> *pyData);
-    void TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pyData);
+    QVector<double> TrendAddFullDay(QString name, QDate date);
+    QVector<double> TrendAddFromToDay(QString name, QDate date, QTime timeFrom, QTime timeTo);
 
-    void XAxisAddFullDay(QDate date, QVector<double> *pxData);
-    void XAxisAddFromToDay(QDate date, QTime timeFrom, QTime timeTo, QVector<double> *pxData);
+    QVector<double> XAxisAddFullDay(QDate date);
+    QVector<double> XAxisAddFromToDay(QDate date, QTime timeFrom, QTime timeTo);
 
     void AllTrendsAddFullDay(QDate date);
     void AllTrendsAddFromToDay(QDate date, QTime timeFrom, QTime timeTo);
