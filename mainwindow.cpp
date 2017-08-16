@@ -41,11 +41,11 @@ MainWindow::MainWindow(QWidget *parent) :
     if (useThread)
     {
         loadThread.mw=this;
-        loadThread.pmtx=&m_mtx;
+        //loadThread.pmtx=&m_mtx;
         connect(&loadThread,SIGNAL(backDayLoad()),this,SLOT(ThreadLoadDay()));
         connect(&loadThread,SIGNAL(allBackDaysLoad()),this,SLOT(ThreadLoadAllBackDays()));
         onlineThread.mw=this;
-        onlineThread.pmtx=&m_mtx;
+        //onlineThread.pmtx=&m_mtx;
         connect(&onlineThread,SIGNAL(onlineDataLoad()),this,SLOT(ThreadLoadOnlineData()));
     }
 
@@ -872,8 +872,8 @@ void MainWindow::CheckNeededBackDaysAndLoad(QDate dateFrom)
 //==================================================================================
 void CheckNeededBackDaysAndLoadThread::run()
 {
-    if (pmtx->tryLock())
-    {
+//    if (pmtx->tryLock())
+//    {
 
         if (mw->startLoadedDT.date() > m_dateFrom)
         {
@@ -891,8 +891,8 @@ void CheckNeededBackDaysAndLoadThread::run()
 
         }
         emit allBackDaysLoad();
-        pmtx->unlock();
-    }
+//        pmtx->unlock();
+//    }
 
 }
 //==================================================================================
@@ -901,7 +901,7 @@ void MainWindow::ThreadLoadDay()
 
     //qDebug() << "load1";
     //RecalcGridInterval();
-    //wGraphic->replot();
+    wGraphic->replot();
 
    //     qDebug() << "load22222";
 }
@@ -909,9 +909,9 @@ void MainWindow::ThreadLoadDay()
 void MainWindow::ThreadLoadAllBackDays()
 {
     RecalcGridInterval();
-    m_mtx.lock();
+//    m_mtx.lock();
     wGraphic->replot();
-    m_mtx.unlock();
+//    m_mtx.unlock();
     //ui->buttonCollapse->setEnabled(true);
     //ui->button50Back->setEnabled(true);
     //ui->button100Back->setEnabled(true);
@@ -926,8 +926,8 @@ void MainWindow::DisableButtonsUntilLoadHistoryData()
 //==================================================================================
 void CheckOnlineDataAndLoadThread::run()
 {
-    if (pmtx->tryLock())
-    {
+//    if (pmtx->tryLock())
+//    {
 
         QDateTime currDT=QDateTime::currentDateTime();
         currDT=currDT.addSecs(-5);
@@ -941,8 +941,8 @@ void CheckOnlineDataAndLoadThread::run()
             mw->AllTrendsAddFromToDay(currDT.date(), QTime(0,0,0), currDT.time());
         }
         emit onlineDataLoad();
-        pmtx->unlock();
-    }
+//        pmtx->unlock();
+//    }
 
     //if (CheckThreadStop()) return;
 
@@ -956,9 +956,9 @@ void MainWindow::ThreadLoadOnlineData()
     RecalcGridInterval();
     wGraphic->xAxis->setRange(currDT.toTime_t()-displayedInterval_sec,
                               currDT.toTime_t());
-    m_mtx.lock();
+    //m_mtx.lock();
     wGraphic->replot();
-    m_mtx.unlock();
+    //m_mtx.unlock();
 }
 //==================================================================================
 void MainWindow::RecalcGridInterval()
