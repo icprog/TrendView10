@@ -100,7 +100,7 @@ private:
     QDate m_dateFrom;
 
 public:
-    //QMutex *pmtx;
+    QMutex *pmtx;
     MainWindow *mw;
     virtual void run();
     void SetDateFrom(QDate dateFrom)
@@ -128,7 +128,7 @@ private:
 
 
 public:
-    //QMutex *pmtx;
+    QMutex *pmtx;
     MainWindow *mw;
     virtual void run();
 
@@ -181,7 +181,7 @@ public:
 
     QVector<Trend *> trends;
 
-    //QMutex m_mtx;
+    QMutex m_mtx;
     CheckNeededBackDaysAndLoadThread loadThread;
     CheckOnlineDataAndLoadThread onlineThread;
 

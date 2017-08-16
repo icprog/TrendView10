@@ -41,11 +41,11 @@ MainWindow::MainWindow(QWidget *parent) :
     if (useThread)
     {
         loadThread.mw=this;
-        //loadThread.pmtx=&m_mtx;
+        loadThread.pmtx=&m_mtx;
         connect(&loadThread,SIGNAL(backDayLoad()),this,SLOT(ThreadLoadDay()));
         connect(&loadThread,SIGNAL(allBackDaysLoad()),this,SLOT(ThreadLoadAllBackDays()));
         onlineThread.mw=this;
-        //onlineThread.pmtx=&m_mtx;
+        onlineThread.pmtx=&m_mtx;
         connect(&onlineThread,SIGNAL(onlineDataLoad()),this,SLOT(ThreadLoadOnlineData()));
     }
 
@@ -539,7 +539,6 @@ void MainWindow::ButtonSaveToFile()
 QVector<double> MainWindow::TrendAddFullDay(QString name, QDate date)
 {
 
-
     float file_buff[17280];
     QVector<double> tmp_vect(17280);
 
@@ -782,7 +781,6 @@ QVector<double> MainWindow::TrendAddFromToDay(QString name, QDate date, QTime ti
         socket.disconnectFromHost();
     }
 
-    if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
     return tmp_vect;
 
 }
@@ -847,6 +845,7 @@ void MainWindow::AllTrendsAddFromToDay(QDate date, QTime timeFrom, QTime timeTo)
         tr->graph->addData(xData,yData);
     }
 
+    if (startLoadedDT > QDateTime(date)) startLoadedDT=QDateTime(date);
     endLoadedDT = QDateTime(date,timeTo);
 }
 //==================================================================================
@@ -872,8 +871,7 @@ void MainWindow::CheckNeededBackDaysAndLoad(QDate dateFrom)
 //==================================================================================
 void CheckNeededBackDaysAndLoadThread::run()
 {
-//    if (pmtx->tryLock())
-//    {
+
 
         if (mw->startLoadedDT.date() > m_dateFrom)
         {
@@ -881,8 +879,12 @@ void CheckNeededBackDaysAndLoadThread::run()
             for(QDate dtToLoad=mw->startLoadedDT.date().addDays(-1);dtToLoad>=m_dateFrom;dtToLoad=dtToLoad.addDays(-1))
             {
 
-                    mw->AllTrendsAddFullDay(dtToLoad);
-                    emit backDayLoad();
+                    /*if (*/pmtx->lock();
+                    //{
+                        mw->AllTrendsAddFullDay(dtToLoad);
+                        emit backDayLoad();
+                        pmtx->unlock();
+                    //}
 
                 if (CheckThreadStop()) return;
 
@@ -891,8 +893,7 @@ void CheckNeededBackDaysAndLoadThread::run()
 
         }
         emit allBackDaysLoad();
-//        pmtx->unlock();
-//    }
+
 
 }
 //==================================================================================
@@ -926,8 +927,8 @@ void MainWindow::DisableButtonsUntilLoadHistoryData()
 //==================================================================================
 void CheckOnlineDataAndLoadThread::run()
 {
-//    if (pmtx->tryLock())
-//    {
+    if (pmtx->tryLock())
+    {
 
         QDateTime currDT=QDateTime::currentDateTime();
         currDT=currDT.addSecs(-5);
@@ -941,8 +942,8 @@ void CheckOnlineDataAndLoadThread::run()
             mw->AllTrendsAddFromToDay(currDT.date(), QTime(0,0,0), currDT.time());
         }
         emit onlineDataLoad();
-//        pmtx->unlock();
-//    }
+        pmtx->unlock();
+    }
 
     //if (CheckThreadStop()) return;
 
